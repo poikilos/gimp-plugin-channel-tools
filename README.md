@@ -9,10 +9,11 @@ if [ -d ~/.config/GIMP/2.10/plug-ins/channel_tools.py ]; then
 fi
 cp channel_tools.py ~/.config/GIMP/2.10/plug-ins/
 if [ -d ~/.config/GIMP/2.10/plug-ins/channel_tools ]; then
+    rm ~/.config/GIMP/2.10/plug-ins/channel_tools  # try symlink FIRST
     rm -Rf ~/.config/GIMP/2.10/plug-ins/channel_tools
 fi
 cp -R channel_tools ~/.config/GIMP/2.10/plug-ins/
 #or
-#ln -s ~/git/channel_tools/channel_tools.py ~/.config/GIMP/2.10/plug-ins/
-#ln -s ~/git/channel_tools/channel_tools ~/.config/GIMP/2.10/plug-ins/
+#ln -s ~/git/gimp-plugin-channel-tools/channel_tools.py ~/.config/GIMP/2.10/plug-ins/
+#ln -s ~/git/gimp-plugin-channel-tools/channel_tools ~/.config/GIMP/2.10/plug-ins/
 ```

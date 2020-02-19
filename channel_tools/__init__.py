@@ -6,7 +6,7 @@ import time
 
 from gimpfu import *  # by convention, import *
 
-
+msg_prefix = "[channel_tools] "
 def fdist(pos1, pos2):
     return math.sqrt((pos2[0] - pos1[0])**2 + (pos2[1] - pos1[1])**2)
 
@@ -58,7 +58,77 @@ def square_gen(pos, rad):
                 y = top
                 break
 
+def convert_depth(color, channel_count, float_max=1.0):
+    """
+    Keyword arguments:
+    float_max -- If color is a float or list of floats to this image,
+        this is the value that is 100%.
 
+    Returns:
+    Always get a tuple with numbers between 0 and 255.
+    """
+    # The checks below are commented for duck typing.
+    # if isinstance(type(color).__name__, "RGB"):
+    #     pass
+        # Always retain this case to avoid additional isinstance calls.
+    # if isinstance(color, tuple):
+        # # Always retain this case to avoid additional isinstance calls.
+        # if isinstance(color[0], float):
+            # new_color = []
+            # for v in color:
+                # new_color.append(convert_depth(v, 1,
+                                               # float_max=float_max)[0])
+            # prev_color = color
+            # color = tuple(new_color)
+            # # print(msg_prefix + "WARNING: converting {} tuple to"
+            # #       " {}".format(prev_color, color))
+    if isinstance(color, list):
+        if isinstance(color[0], float):
+            new_color = []
+            for v in color:
+                new_color.append(convert_depth(v, 1,
+                                               float_max=float_max)[0])
+            color = tuple(color)
+        else:
+            color = tuple(color)
+    elif isinstance(color, int):
+        color = tuple([color])
+    elif isinstance(color, float):
+        if color > float_max:
+            color = float_max
+        elif color < 0.0:
+            color = 0.0
+        prev_color = color
+        color = tuple([int(round((color/float_max) * 255))])
+        # print(msg_prefix + "WARNING: converting {} to"
+        #       " {}".format(prev_color, color))
+    # elif not isinstance(color, list):
+    #     raise TypeError("Color must be a list, tuple, int, or float (got {}).".format(type(color)))
+    p_len = channel_count
+    new_color = None
+    if p_len > len(color):
+        new_color = [i for i in color]
+        while len(new_color) < p_len:
+            new_color.append(255)
+        # print(msg_prefix + "WARNING: expanding {} to"
+        #       " {}".format(color, new_color))
+    elif p_len < len(color):
+        if (p_len == 1) and (len(color) >=3):
+            # FIXME: assumes not indexed
+            v = float(color[0] + color[1] + color[2]) / 3.0
+            prev_color = color
+            color = tuple([int(round(v))])
+            # print(msg_prefix + "WARNING: shrinking {} to"
+            #       " {}".format(prev_color, color))
+        else:
+            new_color = []
+            for i in range(p_len):
+                new_color.append(color[i])
+            # print(msg_prefix + "WARNING: expanding {} to"
+            #       " {}".format(color, new_color))
+    if new_color is not None:
+        color = tuple(new_color)
+    return color
 
 def find_opaque_pos(center, good_minimum=255, max_rad=None,
                     drawable=None, w=None, h=None):
@@ -118,7 +188,7 @@ def find_opaque_pos(center, good_minimum=255, max_rad=None,
             if (not circular) or (dist <= rad_f):
                 # print("  navigating square {} ({} <="
                 #       " {})".format(pos, dist, rad))
-                dst_c, pixel = pdb.gimp_drawable_get_pixel(
+                p_len, pixel = pdb.gimp_drawable_get_pixel(
                     drawable,
                     pos[0],
                     pos[1]
@@ -137,7 +207,9 @@ def draw_square_from_center(center, rad, image=None, drawable=None,
         image = gimp.image_list()[0]
     if drawable is None:
         drawable = pdb.gimp_image_active_drawable(image)
-    new_channels = 4  # must match dest, else ExecutionError
+    p_len, pixel = pdb.gimp_drawable_get_pixel(drawable, 0, 0)
+    color = convert_depth(color, p_len)
+    new_channels = p_len  # must match dest, else ExecutionError
     w = pdb.gimp_image_width(image)
     h = pdb.gimp_image_height(image)
     if color is None:
@@ -189,8 +261,6 @@ def draw_square_from_center(center, rad, image=None, drawable=None,
                     continue
                 pdb.gimp_drawable_set_pixel(drawable, x, y,
                                             new_channels, color)
-    pdb.gimp_drawable_update(drawable, 0, 0, drawable.width,
-                             drawable.height)
 
 def draw_circle_from_center(center, rad, image=None, drawable=None,
                             color=None, filled=False):
@@ -223,11 +293,14 @@ def extend(image=None, drawable=None, minimum=1, maximum=254,
         drawable = pdb.gimp_image_active_drawable(image)
     w = pdb.gimp_image_width(image)
     h = pdb.gimp_image_height(image)
-    new_channels = 4
+
+    new_channels = 4  # TODO: if not drawable.has_alpha: add_layer_mask
     # ^ new_channels must match the destination channel count,
     # or an ExecutionError occurs.
-    if make_opaque:
-        new_channels = 4
+    # if make_opaque:
+    #     new_channels = 4
+
+
     # print("Size: {}".format((w, h)))
     total_f = float(w * h)
     count_f = 0.0
@@ -246,7 +319,7 @@ def extend(image=None, drawable=None, minimum=1, maximum=254,
             #         pdb.gimp_drawable_get_pixel(drawable, x, y)
             #     )
             # )
-            dst_c, pixel = pdb.gimp_drawable_get_pixel(drawable, x, y)
+            p_len, pixel = pdb.gimp_drawable_get_pixel(drawable, x, y)
             if (pixel[3] >= minimum) and (pixel[3] <= maximum):
                 # if all([p == q for p, q in zip(pixel,
                 #                                color_to_edit)]):
@@ -268,7 +341,7 @@ def extend(image=None, drawable=None, minimum=1, maximum=254,
                             # time.sleep(10)
                             # ok = False
                     else:
-                        dst_c, n_pix = pdb.gimp_drawable_get_pixel(
+                        p_len, n_pix = pdb.gimp_drawable_get_pixel(
                             drawable,
                             opaque_pos[0],
                             opaque_pos[1]
@@ -320,9 +393,6 @@ def extend(image=None, drawable=None, minimum=1, maximum=254,
                                " above the minimum good alpha.")
                         print(msg)
                         pdb.gimp_message(msg)
-                        pdb.gimp_drawable_update(drawable, 0, 0,
-                                                 drawable.width,
-                                                 drawable.height)
                     if not enable_threshold:
                         return
             if enable_threshold and not used_th:
@@ -335,5 +405,3 @@ def extend(image=None, drawable=None, minimum=1, maximum=254,
             if count_f is not None:
                 # count_f += 1.0
                 gimp.progress_update(count_f / total_f)
-    pdb.gimp_drawable_update(drawable, 0, 0, drawable.width,
-                             drawable.height)

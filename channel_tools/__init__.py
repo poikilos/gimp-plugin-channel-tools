@@ -112,8 +112,8 @@ def find_opaque_pos(near_pos, good_minimum=255, max_rad=None,
                 continue
             dist = idist(near_pos, pos)
             if dist <= rad_f:
-                print("  navigating square {} ({} <="
-                      " {})".format(pos, dist, rad))
+                # print("  navigating square {} ({} <="
+                #       " {})".format(pos, dist, rad))
                 dst_c, pixel = pdb.gimp_drawable_get_pixel(
                     drawable,
                     pos[0],
@@ -122,8 +122,8 @@ def find_opaque_pos(near_pos, good_minimum=255, max_rad=None,
                 if pixel[3] >= good_minimum:
                     return pos
             else:
-                print("  navigating square {} SKIPPED ({} > "
-                      "{})".format(pos, dist, rad))
+                # print("  navigating square {} SKIPPED ({} > "
+                #       "{})".format(pos, dist, rad))
                 pass
     return None
 
@@ -150,8 +150,8 @@ def draw_square_from_center(center, rad, image=None, drawable=None,
 
     for pos in square_gen(center, rad):
         dist = idist(center, pos)
-        print("  navigating square {} ({} <= {})".format(pos, dist,
-                                                         rad))
+        # print("  navigating square {} ({} <= {})".format(pos, dist,
+        #                                                  rad))
         x, y = pos
         if x < 0:
             continue
@@ -167,7 +167,8 @@ def draw_square_from_center(center, rad, image=None, drawable=None,
 
 
 def extend(image=None, drawable=None, minimum=1, maximum=254,
-           make_opaque=False, good_minimum=255):
+           make_opaque=False, good_minimum=255, enable_threshold=False,
+           threshold=128):
     """
     Keyword arguments:
     minimum -- (0 to 255) Only edit pixels with at least this for alpha.
@@ -199,80 +200,106 @@ def extend(image=None, drawable=None, minimum=1, maximum=254,
     total_f = float(w * h)
     count_f = 0.0
     # ok = True
+    n_pix = None
+    msg = None
     for y in range(h):
         # if not ok:
         #     break
         for x in range(w):
+            used_th = False
             # if count_f is None:
             count_f = float(y) * float(w) + float(x)
-            # print("checking {}".format(
-            #         pdb.gimp_drawable_get_pixel(drawable, x, y)
-            #     ))
+            print(
+                "checking {}".format(
+                    pdb.gimp_drawable_get_pixel(drawable, x, y)
+                )
+            )
             dst_c, pixel = pdb.gimp_drawable_get_pixel(drawable, x, y)
             if (pixel[3] >= minimum) and (pixel[3] <= maximum):
                 # if all([p == q for p, q in zip(pixel,
                 #                                color_to_edit)]):
                 pos = (x, y)
+                print("Looking for pixel near {}...".format(pos))
                 opaque_pos = find_opaque_pos((x, y), drawable=drawable,
                                              w=w, h=h,
                                              good_minimum=good_minimum)
-                if (opaque_pos is not None):
+                if opaque_pos is not None:
                     if opaque_pos == pos:
-                        msg = ("Uh oh, got own pos when checking for"
-                               " better color than {}...".format(pixel))
-                        print(msg)
-                        # pdb.gimp_message(msg)
-                        gimp.progress_init(msg)
-                        gimp.progress_update(0.0)
-                        time.sleep(10)
-                        # ok = False
-                        continue
-                    dst_c, new_pixel = pdb.gimp_drawable_get_pixel(
-                        drawable,
-                        opaque_pos[0],
-                        opaque_pos[1]
-                    )
-                    if new_pixel != pixel:
-                        if make_opaque:
-                            # new_pixel = (new_pixel[0], new_pixel[1],
-                            #              new_pixel[2], 255)
-                            # Keep alpha from good pixel instead of
-                            # using 255.
-                            pass
-                        else:
-                            new_pixel = (new_pixel[0], new_pixel[1],
-                                         new_pixel[2], pixel[3])
-
-                        # print("Changing pixel at {} from {} to "
-                        #       "{}".format((x, y), pixel, new_pixel))
-                        print("Changing pixel at {} using color from"
-                              " {}".format((x, y), opaque_pos))
-                        pdb.gimp_drawable_set_pixel(drawable, x, y,
-                                                    new_channels,
-                                                    new_pixel)
+                        if msg is None:  # only show 1 messagebox
+                            msg = ("Uh oh, got own pos when checking"
+                                   " for better color than"
+                                   " {}...".format(pixel))
+                            print(msg)
+                            pdb.gimp_message(msg)
+                            gimp.progress_init(msg)
+                            gimp.progress_update(0.0)
+                            # time.sleep(10)
+                            # ok = False
                     else:
-                        # msg = ("Uh oh, got own {} color {} at {} when"
-                        #        " checking for color at better pos"
-                        #        " than {}...".format(pixel, new_pixel,
-                        #                             opaque_pos, pos))
-                        # print(msg)
-                        # pdb.gimp_message(msg)
-                        # gimp.progress_init(msg)
-                        # gimp.progress_update(count_f / total_f)
-                        # count_f = None
-                        # time.sleep(10)
-                        # return
-                        # continue
-                        pass
+                        dst_c, n_pix = pdb.gimp_drawable_get_pixel(
+                            drawable,
+                            opaque_pos[0],
+                            opaque_pos[1]
+                        )
+                        if n_pix != pixel:
+                            if make_opaque:
+                                # n_pix = (n_pix[0], n_pix[1],
+                                #              n_pix[2], 255)
+                                # Keep alpha from good pixel instead of
+                                # using 255.
+                                pass
+                            else:
+                                n_pix = (n_pix[0], n_pix[1],
+                                         n_pix[2], pixel[3])
+                            if enable_threshold:
+                                if pixel[3] > threshold:
+                                    n_pix = (n_pix[0], n_pix[1],
+                                             n_pix[2], 255)
+                                else:
+                                    n_pix = (n_pix[0], n_pix[1],
+                                             n_pix[2], 0)
+                                used_th = True
+
+                            # print("Changing pixel at {} from {} to "
+                            #       "{}".format((x, y), pixel, n_pix))
+                            # print("Changing pixel at {} using color from"
+                            #       " {}".format((x, y), opaque_pos))
+                            pdb.gimp_drawable_set_pixel(drawable, x, y,
+                                                        new_channels,
+                                                        n_pix)
+                        else:
+                            # if msg is None:  # only show 1 messagebox
+                            # msg = ("Uh oh, got own {} color {} at {} when"
+                            #        " checking for color at better pos"
+                            #        " than {}...".format(pixel, n_pix,
+                            #                             opaque_pos, pos))
+                            # print(msg)
+                            # pdb.gimp_message(msg)
+                            # gimp.progress_init(msg)
+                            # gimp.progress_update(count_f / total_f)
+                            # count_f = None
+                            # time.sleep(10)
+                            # return
+                            # continue
+                            pass
                 else:
-                    msg = ("Uh oh, the image has no pixels at or above"
-                           " the minimum good alpha.")
-                    print(msg)
-                    pdb.gimp_message(msg)
-                    pdb.gimp_drawable_update(drawable, 0, 0,
-                                             drawable.width,
-                                             drawable.height)
-                    return
+                    if msg is None:  # only show 1 messagebox
+                        msg = ("Uh oh, the image has no pixels at or"
+                               " above the minimum good alpha.")
+                        print(msg)
+                        pdb.gimp_message(msg)
+                        pdb.gimp_drawable_update(drawable, 0, 0,
+                                                 drawable.width,
+                                                 drawable.height)
+                    if not enable_threshold:
+                        return
+            if enable_threshold and not used_th:
+                if pixel[3] > threshold:
+                    n_pix = (pixel[0], pixel[1], pixel[2], 255)
+                else:
+                    n_pix = (pixel[0], pixel[1], pixel[2], 0)
+                pdb.gimp_drawable_set_pixel(drawable, x, y,
+                                            new_channels, n_pix)
             if count_f is not None:
                 # count_f += 1.0
                 gimp.progress_update(count_f / total_f)

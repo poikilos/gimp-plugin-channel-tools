@@ -60,16 +60,19 @@ def square_gen(pos, rad):
 
 
 
-def find_opaque_pos(near_pos, good_minimum=255, max_rad=None,
+def find_opaque_pos(center, good_minimum=255, max_rad=None,
                     drawable=None, w=None, h=None):
     """
     Sequential arguments:
-    near_pos -- This location, or the closest location to it meeting
+    center -- This location, or the closest location to it meeting
     criteria, is the search target.
     Keyword arguments:
     good_minimum -- (0 to 255) If the pixel's alpha is this or higher,
-    get it (the closest in location to near_pos).
+    get it (the closest in location to center).
     """
+    circular = False
+    # ^ True fails for some reason (try it in
+    # draw_square to see the problem).
     if good_minimum < 0:
         good_minimum = 0
     epsilon = sys.float_info.epsilon
@@ -82,25 +85,26 @@ def find_opaque_pos(near_pos, good_minimum=255, max_rad=None,
     if max_rad is None:
         max_rad = 0
         side_distances = [
-            abs(0 - near_pos[0]),
-            abs(w - near_pos[0]),
-            abs(0 - near_pos[1]),
-            abs(h - near_pos[1]),
+            abs(0 - center[0]),
+            abs(w - center[0]),
+            abs(0 - center[1]),
+            abs(h - center[1]),
         ]
         for dist in side_distances:
             if dist > max_rad:
                 max_rad = dist
-    print("find_opaque_pos({},...) # max_rad:{}".format(near_pos,
-                                                        max_rad))
+    # print("find_opaque_pos({},...) # max_rad:{}".format(center,
+    #                                                     max_rad))
     for rad in range(0, max_rad + 1):
-        rad_f = float(rad) - epsilon + 1.0
-        left = near_pos[0] - rad
-        right = near_pos[0] + rad
-        top = near_pos[1] - rad
-        bottom = near_pos[1] + rad
+        # print("  rad: {}".format(rad))
+        rad_f = float(rad) + epsilon + 1.0
+        left = center[0] - rad
+        right = center[0] + rad
+        top = center[1] - rad
+        bottom = center[1] + rad
         # For each side of the square, only use positions within the
         # circle:
-        for pos in square_gen(near_pos, rad):
+        for pos in square_gen(center, rad):
             x, y = pos
             if y < 0:
                 continue
@@ -110,8 +114,8 @@ def find_opaque_pos(near_pos, good_minimum=255, max_rad=None,
                 continue
             if x >= w:
                 continue
-            dist = idist(near_pos, pos)
-            if dist <= rad_f:
+            dist = idist(center, pos)
+            if (not circular) or (dist <= rad_f):
                 # print("  navigating square {} ({} <="
                 #       " {})".format(pos, dist, rad))
                 dst_c, pixel = pdb.gimp_drawable_get_pixel(
@@ -128,7 +132,7 @@ def find_opaque_pos(near_pos, good_minimum=255, max_rad=None,
     return None
 
 def draw_square_from_center(center, rad, image=None, drawable=None,
-                            color=None):
+                            color=None, filled=False, circular=False):
     if image is None:
         image = gimp.image_list()[0]
     if drawable is None:
@@ -147,24 +151,52 @@ def draw_square_from_center(center, rad, image=None, drawable=None,
             color = (0, 0, 0, 255)
         else:
             color = [255 for i in range(new_channels)]
-
-    for pos in square_gen(center, rad):
-        dist = idist(center, pos)
-        # print("  navigating square {} ({} <= {})".format(pos, dist,
-        #                                                  rad))
-        x, y = pos
-        if x < 0:
-            continue
-        if y < 0:
-            continue
-        if x >= w:
-            continue
-        if y >= h:
-            continue
-        pdb.gimp_drawable_set_pixel(drawable, x, y, new_channels, color)
+    radii = None
+    epsilon = sys.float_info.epsilon
+    if filled:
+        radii = []
+        max_rad = 0
+        side_distances = [
+            abs(0 - center[0]),
+            abs(w - center[0]),
+            abs(0 - center[1]),
+            abs(h - center[1]),
+        ]
+        for dist in side_distances:
+            if dist > max_rad:
+                max_rad = dist
+        for rad in range(0, max_rad + 1):
+            radii.append(rad)
+    else:
+        radii = [rad]
+    diag = math.sqrt(2.0)
+    # print("using diagonal pixel measurement: {}".format(diag))
+    for rad in radii:
+        rad_f = float(rad) + epsilon + diag*2
+        for pos in square_gen(center, rad):
+            dist = idist(center, pos)
+            # print("  navigating square {} ({} <= {})".format(pos, dist,
+            #                                                  rad))
+            if (not circular) or (dist <= rad_f):
+                x, y = pos
+                if x < 0:
+                    continue
+                if y < 0:
+                    continue
+                if x >= w:
+                    continue
+                if y >= h:
+                    continue
+                pdb.gimp_drawable_set_pixel(drawable, x, y,
+                                            new_channels, color)
     pdb.gimp_drawable_update(drawable, 0, 0, drawable.width,
                              drawable.height)
 
+def draw_circle_from_center(center, rad, image=None, drawable=None,
+                            color=None, filled=False):
+    return draw_square_from_center(center, rad, image=image,
+                                   drawable=drawable, color=color,
+                                   filled=filled, circular=True)
 
 def extend(image=None, drawable=None, minimum=1, maximum=254,
            make_opaque=False, good_minimum=255, enable_threshold=False,
@@ -196,7 +228,7 @@ def extend(image=None, drawable=None, minimum=1, maximum=254,
     # or an ExecutionError occurs.
     if make_opaque:
         new_channels = 4
-    print("Size: {}".format((w, h)))
+    # print("Size: {}".format((w, h)))
     total_f = float(w * h)
     count_f = 0.0
     # ok = True
@@ -209,17 +241,17 @@ def extend(image=None, drawable=None, minimum=1, maximum=254,
             used_th = False
             # if count_f is None:
             count_f = float(y) * float(w) + float(x)
-            print(
-                "checking {}".format(
-                    pdb.gimp_drawable_get_pixel(drawable, x, y)
-                )
-            )
+            # print(
+            #     "checking {}".format(
+            #         pdb.gimp_drawable_get_pixel(drawable, x, y)
+            #     )
+            # )
             dst_c, pixel = pdb.gimp_drawable_get_pixel(drawable, x, y)
             if (pixel[3] >= minimum) and (pixel[3] <= maximum):
                 # if all([p == q for p, q in zip(pixel,
                 #                                color_to_edit)]):
                 pos = (x, y)
-                print("Looking for pixel near {}...".format(pos))
+                # print("Looking for pixel near {}...".format(pos))
                 opaque_pos = find_opaque_pos((x, y), drawable=drawable,
                                              w=w, h=h,
                                              good_minimum=good_minimum)

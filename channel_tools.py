@@ -6,14 +6,15 @@ using the nearest opaque pixel.
 from gimpfu import *  # by convention, import *
 
 from channel_tools import extend
-# from channel_tools import draw_square_from_center
+from channel_tools import draw_square_from_center
+from channel_tools import draw_circle_from_center
 
 def remove_layer_halo(image, drawable, minimum, maximum, good_minimum,
                       make_opaque, enable_threshold, threshold):
     gimp.progress_init("This may take a while...")
-    print("options: {}".format((str(image), str(drawable), str(minimum),
-                               str(maximum), str(make_opaque),
-                               str(good_minimum))))
+    # print("options: {}".format((str(image), str(drawable), str(minimum),
+    #                            str(maximum), str(make_opaque),
+    #                            str(good_minimum))))
     extend(image=image, drawable=drawable, minimum=minimum,
            maximum=maximum, make_opaque=make_opaque,
            good_minimum=good_minimum, enable_threshold=enable_threshold,
@@ -23,13 +24,18 @@ def remove_layer_halo(image, drawable, minimum, maximum, good_minimum,
     # draw_square_from_center((4,4), 4, image=image, drawable=drawable,
     #                         color=(0,255,0,255))
     # draw_square_from_center((4,4), 0, image=image, drawable=drawable)
+    # draw_square_from_center((4,4), 0, image=image, drawable=drawable,
+    #                         color=(0,0,0,255), filled=True)
+    # draw_circle_from_center((128,128), 32, image=image,
+    #                         drawable=drawable,
+    #                         color=(255,0,0,255), filled=True)
     # draw_square_from_center((1,1), 2, image=image, drawable=drawable,
     #                         color=(0,0,255,255))
-    print("updating image...")
+    # print("updating image...")
     pdb.gimp_displays_flush()
     # ^ update the image; only works since the called method already
     # has called pdb.gimp_drawable_update(...).
-    print("done (remove_layer_halo)")
+    # print("done (remove_layer_halo)")
 
 max_tip = "Maximum to discard (254 unless less damaged)"
 goot_min_tip = "get nearby >= this (usually max discard+1)."

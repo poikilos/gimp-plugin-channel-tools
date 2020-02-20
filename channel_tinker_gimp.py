@@ -3,12 +3,81 @@
 For each pixel where the alpha is below the threshold, get a new color
 using the nearest opaque pixel.
 """
+
+import math
+import sys
+from itertools import chain
+import time
+
 from gimpfu import *  # by convention, import *
 
-from channel_tools import extend
-from channel_tools import draw_square_from_center
-from channel_tools import draw_circle_from_center
-from channel_tools import convert_depth
+from channel_tinker import convert_depth
+from channel_tinker import error
+from channel_tinker import idist
+from channel_tinker import find_opaque_pos
+from channel_tinker import ChannelTinkerInterface
+from channel_tinker import ChannelTinkerProgressInterface
+from channel_tinker import draw_circle_from_center
+from channel_tinker import extend
+from channel_tinker import draw_square_from_center
+
+
+class GimpCTPI(ChannelTinkerProgressInterface):
+    def progress_update(self, factor):
+        gimp.progress_update(factor)
+
+    def set_status(self, msg):
+        gimp.progress_init(msg)
+
+    def show_message(self, msg):
+        pdb.gimp_message(msg)
+
+class GimpCTI(ChannelTinkerInterface):
+
+    @property
+    def size(self):
+        return self._size
+
+    def __init__(self, image, drawable=None):
+        self.image = image
+        if drawable is None:
+            drawable = pdb.gimp_image_active_drawable(image)
+        self.drawable = drawable
+        w = pdb.gimp_image_width(self.image)
+        h = pdb.gimp_image_height(self.image)
+        self._size = (w, h)
+        self.size = self._size
+        self._bands = None
+        self._p_len = None # for caching--not exposed
+
+    def getbands(self):
+        if self._bands is not None:
+            return self._bands
+        pos = (0, 0)
+        p_len, pixel = pdb.gimp_drawable_get_pixel(self.drawable,
+                                                   pos[0], pos[1])
+        # TODO: return something more accurate if necessary.
+        if p_len == 1:
+            # See <https://stackoverflow.com/questions/52962969/
+            # number-of-channels-in-pil-pillow-image>
+            self._bands = tuple('L')  # Luma
+            # TODO: handle 'P' (See <https://www.geeksforgeeks.org/
+            #     pyhton-pil-getbands-method/>) [sic]
+        else:
+            self._bands = tuple("RGBA??????????"[:p_len])
+        self._p_len = len(self._bands)
+        return self._bands
+
+    def getpixel(self, pos):
+        p_len, pixel = pdb.gimp_drawable_get_pixel(self.drawable,
+                                                   pos[0], pos[1])
+        return pixel
+
+    def putpixel(self, pos, color):
+        if self._p_len is None:
+            count = len(self.getbands())  # generates _p_len
+        pdb.gimp_drawable_set_pixel(self.drawable, pos[0], pos[1],
+                                    self._p_len, color)
 
 
 def ct_draw_centered_circle(image, drawable, radius, color, filled):
@@ -43,9 +112,10 @@ def ct_draw_centered_circle(image, drawable, radius, color, filled):
                " drawing function cannot draw exactly centered"
                " " + post_msg + ".")
         pdb.gimp_message(msg)
-
-    draw_circle_from_center((x, y), radius, image=image,
-                            drawable=drawable,
+    # exists, x1, y1, x2, y2 = \
+    #     pdb.gimp_selection_bounds(self.image)
+    cti = GimpCTI(image, drawable=drawable)
+    draw_circle_from_center(cti, (x, y), radius,
                             color=color, filled=filled)
     pdb.gimp_drawable_update(drawable, 0, 0, drawable.width,
                              drawable.height)
@@ -78,9 +148,8 @@ def ct_draw_centered_square(image, drawable, radius, color, filled):
 
     print("image.channels: {}".format(image.channels))
     print("image.base_type: {}".format(image.channels))
-
-    draw_square_from_center((x, y), radius, image=image,
-                            drawable=drawable, color=color,
+    cti = GimpCTI(image, drawable=drawable)
+    draw_square_from_center(cti, (x, y), radius, color=color,
                             filled=filled)
     pdb.gimp_drawable_update(drawable, 0, 0, drawable.width,
                              drawable.height)
@@ -90,14 +159,22 @@ def ct_draw_centered_square(image, drawable, radius, color, filled):
 
 def ct_remove_layer_halo(image, drawable, minimum, maximum, good_minimum,
                          make_opaque, enable_threshold, threshold):
+    image.disable_undo()
     gimp.progress_init("This may take a while...")
     # print("options: {}".format((str(image), str(drawable), str(minimum),
     #                            str(maximum), str(make_opaque),
     #                            str(good_minimum))))
-    extend(image=image, drawable=drawable, minimum=minimum,
+    cti = GimpCTI(image, drawable=drawable)
+    ctpi = GimpCTPI()
+    extend(cti, minimum=minimum,
            maximum=maximum, make_opaque=make_opaque,
            good_minimum=good_minimum, enable_threshold=enable_threshold,
-           threshold=threshold)
+           threshold=threshold, ctpi=ctpi)
+    # if image is None:
+    #     image = gimp.image_list()[0]
+    # if drawable is None:
+    #     drawable = pdb.gimp_image_active_drawable(image)
+
     pdb.gimp_drawable_update(drawable, 0, 0, drawable.width,
                              drawable.height)
     pdb.gimp_displays_flush()
@@ -131,7 +208,7 @@ register(
     ],
     [], # results
     ct_remove_layer_halo,
-    menu="<Image>/Layer/Channel Tools"
+    menu="<Image>/Colors/Channel Tinker"
 )
 
 # register(
@@ -150,7 +227,7 @@ register(
     # ],
     # [], # results
     # ct_draw_centered_circle,
-    # menu="<Image>/Layer/Channel Tools"
+    # menu="<Image>/Colors/Channel Tinker"
 # )
 
 
@@ -170,7 +247,7 @@ register(
     ],
     [], # results
     ct_draw_centered_square,
-    menu="<Image>/Layer/Channel Tools"
+    menu="<Image>/Colors/Channel Tinker"
 )
 
 main()

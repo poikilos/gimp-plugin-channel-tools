@@ -38,9 +38,10 @@ class ChannelTinkerProgressInterface:
 
 
 
-# (The @property decorator is always available, since every class
-# descends from Object).
-class ChannelTinkerInterface:
+# (The @property decorator is always available in Python 3, since every
+# class descends from Object but must be explicit for compatibility
+# with Python 2).
+class ChannelTinkerInterface(object):
     """
     If you do not provide a PIL image to various functions in this
     library, you can implement ChannelTinkerInterface and provide an

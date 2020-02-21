@@ -46,7 +46,6 @@ class GimpCTI(ChannelTinkerInterface):
         w = pdb.gimp_image_width(self.image)
         h = pdb.gimp_image_height(self.image)
         self._size = (w, h)
-        self.size = self._size
         self._bands = None
         self._p_len = None # for caching--not exposed
 

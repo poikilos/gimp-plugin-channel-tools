@@ -16,13 +16,14 @@ def run(base_path, head_path, diff_name=None):
     results = diff_images_by_path(base_path, head_path,
                                   diff_path=diff_name)
     print(json.dumps(results, indent=2))
+    return results
 
 
 def main():
     if len(sys.argv) != 3:
         error("You must specify two files.")
         exit(1)
-    run(sys.argv[1], sys.argv[2])
+    results = run(sys.argv[1], sys.argv[2])
 
 
 if __name__ == "__main__":

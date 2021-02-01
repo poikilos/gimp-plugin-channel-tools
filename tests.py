@@ -2,4 +2,6 @@
 
 from diffimage import run as run_cli
 
-run_cli("test_diff_base.png", "test_diff_head.png", "tmp.png")
+diff = run_cli("test_diff_base.png", "test_diff_head.png", "tmp.png")
+assert diff['same'] is False
+print("All tests passed.")

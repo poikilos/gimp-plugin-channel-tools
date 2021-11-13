@@ -58,54 +58,74 @@ class MainFrame(ttk.Frame):
 
     def __init__(self, parent):
         self.img = None
+        self.metas = []
         self.nameSV = tk.StringVar()
         self.pathSV = tk.StringVar()
         self.mainSV = tk.StringVar()
         self.listSV = tk.StringVar()
         self.statusSV = tk.StringVar()
+        self.markSV = tk.BooleanVar()
         ttk.Frame.__init__(self, parent)
+        self.style = ttk.Style(parent)
+        # print("{}".format(self.style.theme_names()))
+        # ^ ('clam', 'alt', 'default', 'classic')
+        self.style.theme_use('alt')
+        # ^ Theme Checkbutton styles (check graphic):
+        # 'classic', 'default': shading only
+        # 'clam': x
         self.pack(fill=tk.BOTH, expand=True)
         self.issues = [
             MainFrame.ISSUE_DIR,
             MainFrame.ISSUE_LIST,
         ]
+        # self.columnconfigure(tuple(range(2)), weight=1)
+        self.columnconfigure(1, weight=1)  # Make col 1 (2nd col) expand
+        # Make col 1 (2nd col) expand: affects grid items with tk.W+tk.E
+        # self.rowconfigure(tuple(range(10)), weight=1)
+        # ^ rowconfigure with weight makes buttons stay spaced evenly
         row = 0
         wide_width = 30
-        ttk.Label(self, textvariable=self.statusSV).grid(column=0, row=row, sticky=tk.E, columnspan=2)
+        ttk.Label(self, textvariable=self.statusSV).grid(column=0, row=row, sticky=tk.W+tk.E, columnspan=2)
         self.statusSV.set("Specify a Directory. Specify a file list.")
         row += 1
         ttk.Label(self, text="Directory:").grid(column=0, row=row, sticky=tk.E)
-        ttk.Entry(self, width=25, textvariable=self.mainSV, state="readonly").grid(column=1, columnspan=3, row=row, sticky=tk.W)
+        ttk.Entry(self, width=25, textvariable=self.mainSV, state="readonly").grid(column=1, columnspan=3, row=row, sticky=tk.W+tk.E)
         row += 1
         ttk.Label(self, text="List:").grid(column=0, row=row, sticky=tk.E)
-        ttk.Entry(self, width=25, textvariable=self.listSV, state="readonly").grid(column=1, columnspan=3, row=row, sticky=tk.W)
+        ttk.Entry(self, width=25, textvariable=self.listSV, state="readonly").grid(column=1, columnspan=3, row=row, sticky=tk.W+tk.E)
         row += 1
         ttk.Label(self, text="Name:").grid(column=0, row=row, sticky=tk.E)
-        ttk.Entry(self, width=25, textvariable=self.nameSV, state="readonly").grid(column=1, columnspan=3, row=row, sticky=tk.W)
+        ttk.Entry(self, width=25, textvariable=self.nameSV, state="readonly").grid(column=1, columnspan=3, row=row, sticky=tk.W+tk.E)
         row += 1
         ttk.Label(self, text="Path:").grid(column=0, row=row, sticky=tk.E)
         self.pathEntry = ttk.Entry(self, width=25, textvariable=self.pathSV)
-        self.pathEntry.grid(column=1, columnspan=3, row=row, sticky=tk.W)
+        self.pathEntry.grid(column=1, columnspan=3, row=row, sticky=tk.W+tk.E)
         row += 1
         self.prevBtn = ttk.Button(self, text="Previous", command=self.prevFile)
-        self.prevBtn.grid(column=1, row=row, sticky=tk.E)
+        self.prevBtn.grid(column=0, row=row, sticky=tk.E)
         self.nextBtn = ttk.Button(self, text="Next", command=self.nextFile)
         self.nextBtn.grid(column=2, row=row, sticky=tk.W)
+        # row += 1
+        self.markBtn = ttk.Checkbutton(self, onvalue=True, offvalue=False, variable=self.markSV)
+        self.markBtn.grid(column=1, row=row)
+        # ttk.Button(self, text="Exit", command=root.destroy).grid(column=2, row=row, sticky=tk.W)
         row += 1
-        self.markBtn = ttk.Button(self, text="Mark", command=self.markFile)
-        self.markBtn.grid(column=1, row=row, sticky=tk.E)
-        ttk.Button(self, text="Exit", command=root.destroy).grid(column=2, row=row, sticky=tk.W)
-        row += 1
-        self.imgLabel = ttk.Label(self, text="...")
-        self.imgLabel.grid(column=0, row=row, sticky=tk.E, columnspan=2)
+        self.imgLabel = ttk.Label(self)  # , text="..."
+        self.imgLabel.grid(column=0, row=row, columnspan=3)
         for child in self.winfo_children():
             child.grid_configure(padx=6, pady=3)
         self.nextBtn['state'] = tk.DISABLED
         self.prevBtn['state'] = tk.DISABLED
+        self.markBtn['state'] = tk.DISABLED
         # self.nameSV.set(money(session.getCurrentMoney(playerIndex)))
 
     def setPath(self, path):
-        self.issues.remove(MainFrame.ISSUE_DIR)
+        self.removeIssue(MainFrame.ISSUE_DIR)
+        self.mainSV.set(path)
+
+    def removeIssue(self, msg):
+        if msg in self.issues:
+            self.issues.remove(msg)
         # print("self.issues: {}".format(self.issues))
         statusStr = ""
         space = ""
@@ -113,28 +133,10 @@ class MainFrame(ttk.Frame):
             statusStr += space + issueStr
             space = " "
         self.statusSV.set(statusStr)
-        self.mainSV.set(path)
 
     def setList(self, path):
-        self.issues.remove(MainFrame.ISSUE_LIST)
-        print("self.issues: {}".format(self.issues))
-        statusStr = ""
-        space = ""
-        for issueStr in self.issues:
-            statusStr += space + issueStr
-            space = " "
-        self.statusSV.set(statusStr)
+        self.removeIssue(MainFrame.ISSUE_LIST)
         self.listSV.set(path)
-
-
-    def showImage(self, path):
-        '''
-        See Apostolos' Apr 14 '18 at 16:20 answer edited Oct 26 '18 at
-        8:40 on <https://stackoverflow.com/a/49833564>
-        '''
-        self.img = ImageTk.PhotoImage(Image.open(path))
-        # self.imgLabel = tk.Label(window, image=self.img).pack()
-        self.imgLabel.configure(image=self.img)
 
     def getBasePath(self):
         result = "."
@@ -147,11 +149,17 @@ class MainFrame(ttk.Frame):
         return os.path.join(self.getBasePath(), rel)
 
     def loadList(self, path):
-        self.names = []
-        self.nameI = 0
+        self.metas = []
+        self.metaI = 0
+        found = 0
         with open(path, 'r') as ins:
             for rawL in ins:
-                line = rawL.strip()
+                isFound = False
+                raw2 = rawL.rstrip()
+                line = raw2.strip()
+                indent = ""
+                if len(line) < len(raw2):
+                    indent = raw2[len(raw2)-len(line):]
                 parts = line.split(" ")
                 cols = 1
                 name = line[-1]
@@ -161,58 +169,139 @@ class MainFrame(ttk.Frame):
                     # print("tryName: \"{}\"".format(tryName))
                     tryPath = self.getFullPath(tryName)
                     if os.path.isfile(tryPath):
-                        self.names.append(tryName)
+                        self.metas.append({
+                            'name': tryName,
+                            'line': rawL.rstrip(),
+                            'prefix': indent + " ".join(parts[:-cols])
+                        })
+                        found += 1
+                        isFound = True
                         break
                     cols += 1
-        # print("names: {}".format(self.names))
-
+                if not isFound:
+                    self.metas.append({
+                        'line': rawL.rstrip(),
+                    })
+        if found > 0:
+            self.removeIssue(MainFrame.ISSUE_DIR)
+        # print("metas: {}".format(self.metas))
 
     def onFormLoaded(self):
         path = self.listSV.get().strip()
         if len(path) < 1:
             return
         self.loadList(path)
-        if len(self.names) > 0:
+        if len(self.metas) > 0:
             self.showCurrentImage()
             self.prevBtn['state'] = tk.DISABLED
-            if len(self.names) > 1:
+            if len(self.metas) > 1:
                 self.nextBtn['state'] = tk.NORMAL
 
     def prevFile(self):
-        self.nameI -= 1
-        if self.nameI < 0:
-            self.nameI = len(self.names) - 1
+        self.metaI -= 1
+        if self.metaI < 0:
+            self.metaI = len(self.metas) - 1
         self.showCurrentImage()
         self.updateButtonStates()
 
+    def showImage(self, path):
+        '''
+        See Apostolos' Apr 14 '18 at 16:20 answer edited Oct 26 '18 at
+        8:40 on <https://stackoverflow.com/a/49833564>
+        '''
+        self.img = ImageTk.PhotoImage(Image.open(path))
+        self.nameSV.set(os.path.split(path)[1])
+        self.pathSV.set(path)
+        # self.imgLabel = tk.Label(window, image=self.img).pack()
+        self.imgLabel.configure(image=self.img)
+        self.markBtn['state'] = tk.NORMAL
+
     def showCurrentImage(self):
-        self.showImage(self.names[self.nameI])
+        meta = self.metas[self.metaI]
+        name = meta.get('name')
+        if name is not None:
+            self.statusSV.set("")
+            self.showImage(name)
+            if meta.get('checked') is True:
+                self.markSV.set(True)
+            else:
+                self.markSV.set(False)
+        else:
+            self.statusSV.set(meta.get('line'))
+            self.nameSV.set("")
+            self.pathSV.set("")
+            self.imgLabel.configure(image='')
+            self.markSV.set(False)
+
+    def hasNext(self):
+        if self.metas is None:
+            return False
+        if self.metaI < 0:
+            return False
+        return self.metaI + 1 < len(self.metas)
+
+    def hasPrev(self):
+        if self.metas is None:
+            return False
+        if self.metaI < 0:
+            return False
+        return self.metaI > 0
 
     def updateButtonStates(self):
-        if self.nameI + 1 < len(self.names):
+        if self.hasNext():
             self.nextBtn['state'] = tk.NORMAL
         else:
             self.nextBtn['state'] = tk.DISABLED
-        if self.nameI > 0:
+        if self.hasPrev():
             self.prevBtn['state'] = tk.NORMAL
         else:
             self.prevBtn['state'] = tk.DISABLED
 
     def nextFile(self):
-        self.nameI += 1
-        if self.nameI >= len(self.names):
-            self.nameI = 0
+        self.metaI += 1
+        if self.metaI >= len(self.metas):
+            self.metaI = 0
         self.showCurrentImage()
         self.updateButtonStates()
 
-    def markFile(self):
-        pass
+    def markFile(self, mark):
+        self.markSV.set(mark)
+        if mark:
+            self.metas[self.metaI]['checked'] = True
 
     def end(self):
         self.nextBtn['state'] = tk.DISABLED
         self.prevBtn['state'] = tk.DISABLED
         self.markBtn['state'] = tk.NORMAL
 
+    def onKeyPress(self, event):
+        if event.keysym == 'Right':
+            if str(self.nextBtn['state']) == tk.NORMAL:
+                self.nextFile()
+        elif event.keysym == 'Left':
+            if str(self.prevBtn['state']) == tk.NORMAL:
+                self.prevFile()
+        elif event.keysym == 'Down':
+            if str(self.markBtn['state']) == tk.NORMAL:
+                self.markFile(True)
+        elif event.keysym == 'Up':
+            if str(self.markBtn['state']) == tk.NORMAL:
+                self.markFile(False)
+        else:
+            print("{}".format(event))
+            # ^ such as:
+            '''
+            <KeyPress event keysym=Right keycode=114 x=-1160 y=322>
+            <KeyPress event keysym=Left keycode=113 x=-1160 y=322>
+            <KeyPress event keysym=minus keycode=20 char='-' x=-1160 y=322>
+            <KeyPress event keysym=equal keycode=21 char='=' x=-1160 y=322>
+            <KeyPress event keysym=Shift_L keycode=50 x=-1160 y=322>
+            <KeyPress event state=Shift keysym=underscore keycode=20 char='_' x=-1160 y=322>
+            <KeyPress event state=Shift keysym=plus keycode=21 char='+' x=-1160 y=322>
+            <KeyPress event keysym=1 keycode=10 char='1' x=-1160 y=322>
+            <KeyPress event keysym=space keycode=65 char=' ' x=-1160 y=322>
+            <KeyPress event keysym=Return keycode=36 char='\r' x=-1160 y=322>
+            '''
 
 def main():
     global session
@@ -222,6 +311,7 @@ def main():
     root = tk.Tk()
     root.title("ImageProcessorX")
     mainframe = MainFrame(root)
+    root.bind('<KeyPress>', mainframe.onKeyPress)
     prevArg = None
     mainDirPath = None
     listPath = None
@@ -229,12 +319,12 @@ def main():
         if prevArg is None:
             prevArg = arg  # the command that ran this script
             continue
-        if mainDirPath is None:
-            mainDirPath = arg
-            mainframe.setPath(arg)
-        elif listPath is None:
+        if listPath is None:
             listPath = arg
             mainframe.setList(arg)
+        elif mainDirPath is None:
+            mainDirPath = arg
+            mainframe.setPath(arg)
         prevArg = arg
     root.after(1, mainframe.onFormLoaded)  # (milliseconds, function)
     root.mainloop()

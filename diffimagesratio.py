@@ -89,7 +89,7 @@ def showDiffRatioForImages(base_path, head_path, root=None, indent="",
                 if results['head'].get('error') is not None:
                     print(indent+"- [ ] unreadable: {}".format(headSubPath))
                 elif results['base'].get('error') is not None:
-                    print(indent+"- [ ] unreadable in previous version: {}".format(baseSubPath))
+                    print(indent+"- [ ] unreadable in previous version: {}".format(headSubPath))
                 elif results['head']['ratio'] > results['base']['ratio']:
                     if (max_source_ratio is not None) and (results['base']['ratio'] > max_source_ratio):
                         continue

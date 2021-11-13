@@ -12,6 +12,11 @@ If the filenames are relative, the current working directory must be the
 base path in which the relative paths can be used.
 '''
 
+import os
+import sys
+import platform
+import math
+
 dephelp = "sudo apt-get install python3-pil python3-pil.imagetk"
 try:
     import Tkinter as tk
@@ -43,10 +48,6 @@ import locale as lc
 session = {}
 playerIndex = 0
 
-import os
-import sys
-import math
-
 checkDotTypes = [
     ".png",
     ".jpg",
@@ -54,11 +55,16 @@ checkDotTypes = [
 ]
 
 class MainFrame(ttk.Frame):
-    ISSUE_DIR = 'Specify a directory.'
+    ISSUE_DIR = 'Specify a main directory.'
     ISSUE_LIST = 'Specify a list file.'
 
     def __init__(self, parent):
+        self.parent = parent  # tk root
+        self.timedMsg = None
+        self.prevMsg = None
+        self.checkedSuffix = ".checked"
         self.img = None
+        self.listPath = None
         self.metas = []
         self.nameSV = tk.StringVar()
         self.pathSV = tk.StringVar()
@@ -75,6 +81,15 @@ class MainFrame(ttk.Frame):
         # 'classic', 'default': shading only
         # 'clam': x
         self.pack(fill=tk.BOTH, expand=True)
+        self.menuBar = tk.Menu(parent)
+        self.fileMenu = tk.Menu(self.menuBar, tearoff=0)
+        self.fileMenu.add_command(label="Save Checked",
+                                  command=self.saveChecked)
+        self.fileMenu.add_separator()
+        self.fileMenu.add_command(label="Exit", command=quit)
+        self.menuBar.add_cascade(label="File", menu=self.fileMenu)
+        parent.config(menu=self.menuBar)
+
         self.issues = [
             MainFrame.ISSUE_DIR,
             MainFrame.ISSUE_LIST,
@@ -87,9 +102,9 @@ class MainFrame(ttk.Frame):
         row = 0
         wide_width = 30
         ttk.Label(self, textvariable=self.statusSV).grid(column=0, row=row, sticky=tk.W+tk.E, columnspan=2)
-        self.statusSV.set("Specify a Directory. Specify a file list.")
+        self.statusSV.set("Specify a main directory. Specify a file list.")
         row += 1
-        ttk.Label(self, text="Directory:").grid(column=0, row=row, sticky=tk.E)
+        ttk.Label(self, text="Main Directory:").grid(column=0, row=row, sticky=tk.E)
         ttk.Entry(self, width=25, textvariable=self.mainSV, state="readonly").grid(column=1, columnspan=3, row=row, sticky=tk.W+tk.E)
         row += 1
         ttk.Label(self, text="List:").grid(column=0, row=row, sticky=tk.E)
@@ -119,6 +134,53 @@ class MainFrame(ttk.Frame):
         self.prevBtn['state'] = tk.DISABLED
         self.markBtn['state'] = tk.DISABLED
         # self.nameSV.set(money(session.getCurrentMoney(playerIndex)))
+
+    def timedMessage(self, msg, delay=2000):
+        '''
+        Show a message temporarily, then revert to the previous message
+        unless the message changed.
+        Keyword arguments:
+        delay -- Disappear after this many milliseconds.
+        '''
+        self.prevMsg = self.statusSV.get()
+        self.timedMsg = msg
+        self.statusSV.set(msg)
+        self.parent.after(delay, self.revertTimedMessage)
+
+    def revertTimedMessage(self):
+        '''
+        Only revert the message if the message is known. If the timed
+        message was interrupted, leave the new message as is.
+        '''
+        if self.statusSV.get() == self.timedMsg:
+            self.statusSV.set(self.prevMsg)
+
+    def saveChecked(self):
+        '''
+        Save self.listPath with self.checkedSuffix added to the
+        filename.
+        '''
+        if self.listPath is None:
+            self.statusSV.set("Error: There is no filename")
+            return
+        if len(self.metas) < 1:
+            self.statusSV.set("Error: There is no list loaded.")
+            return
+        parts = os.path.splitext(self.listPath)
+        destPath = parts[0] + self.checkedSuffix + parts[1]
+        destName = os.path.split(destPath)[1]
+        self.timedMessage("Saved {}".format(destName))
+        with open(destPath, 'w') as outs:
+            for meta in self.metas:
+                keep = meta.get('checked')
+                name = meta.get('name')
+                if name is None:
+                    # Keep comments etc. (any line that isn't a file).
+                    keep = True
+                if not keep:
+                    continue
+                outs.write("{}\n".format(meta['line']))
+
 
     def setPath(self, path):
         self.removeIssue(MainFrame.ISSUE_DIR)
@@ -150,6 +212,7 @@ class MainFrame(ttk.Frame):
         return os.path.join(self.getBasePath(), rel)
 
     def loadList(self, path):
+        self.listPath = path
         self.metas = []
         self.metaI = 0
         found = 0
@@ -316,7 +379,25 @@ def main():
     global root
     root = tk.Tk()
     root.title("ImageProcessorX")
+    myPath = os.path.split(os.path.abspath(__file__))[0]
+    # iconPath = iconPath = os.path.join(myPath, "imageprocessorx.xbm")
+    '''
+    ^ XBM is the required type for iconbitmap's default param on linux
+    supposedly
+    (<https://stackoverflow.com/questions/29973246/using-tkinter-
+    command-iconbitmap-to-set-window-icon>)
+    but doesn't work (see error in comment below).
+    '''
+    iconPath = iconPath = os.path.join(myPath, "imageprocessorx.png")
+    if platform.system() == "Windows":
+        iconPath = os.path.join(myPath, "imageprocessorx.ico")
     mainframe = MainFrame(root)
+    if os.path.isfile(iconPath):
+        # root.iconbitmap(default=iconPath)
+        # ^ "root.MyIcon = Tk.PhotoImage(file='/usr/share/icons/gnome/32x32/apps/zen-icon.png')"
+        # See <https://forums.raspberrypi.com/viewtopic.php?t=254725>
+        root.MyIcon = tk.PhotoImage(file=iconPath)
+        root.iconphoto(True, root.MyIcon)
     root.bind('<KeyPress>', mainframe.onKeyPress)
     prevArg = None
     mainDirPath = None

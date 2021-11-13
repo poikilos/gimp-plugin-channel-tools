@@ -23,6 +23,7 @@ except ModuleNotFoundError:
     import tkinter as tk
     from tkinter import ttk
 
+import PIL
 from PIL import Image
 
 try:
@@ -209,12 +210,17 @@ class MainFrame(ttk.Frame):
         See Apostolos' Apr 14 '18 at 16:20 answer edited Oct 26 '18 at
         8:40 on <https://stackoverflow.com/a/49833564>
         '''
-        self.img = ImageTk.PhotoImage(Image.open(path))
+        try:
+            self.img = ImageTk.PhotoImage(Image.open(path))
+            self.statusSV.set("")
+            self.imgLabel.configure(image=self.img)
+            self.markBtn['state'] = tk.NORMAL
+        except PIL.UnidentifiedImageError:
+            self.imgLabel.configure(image='')
+            self.statusSV.set("Error: unreadable image")
         self.nameSV.set(os.path.split(path)[1])
         self.pathSV.set(path)
         # self.imgLabel = tk.Label(window, image=self.img).pack()
-        self.imgLabel.configure(image=self.img)
-        self.markBtn['state'] = tk.NORMAL
 
     def showCurrentImage(self):
         meta = self.metas[self.metaI]

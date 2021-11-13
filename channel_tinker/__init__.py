@@ -7,6 +7,10 @@ import os
 import math
 import sys
 
+name_fmt0 = "{}-{}-vs-{}.png"
+name_fmt1 = "diffimage {}.png"
+name_fmt2 = "diffimage {} vs. {}.png"
+
 
 class ChannelTinkerProgressInterface:
 
@@ -82,10 +86,12 @@ class ChannelTinkerInterface(object):
 
 _error_func = None
 
+
 def _error(msg):
     sys.stderr.write(msg + "\n")
 
 _error_func = _error
+
 
 def error(msg):
     """
@@ -93,6 +99,7 @@ def error(msg):
     to a callback you previously specified via set_error_func).
     """
     _error_func(msg)
+
 
 def set_error_func(callback):
     """
@@ -102,6 +109,7 @@ def set_error_func(callback):
     """
     global _error_func
     _error_func = callback
+
 
 def convert_depth(color, channel_count, c_max=1.0):
     """
@@ -174,6 +182,7 @@ def convert_depth(color, channel_count, c_max=1.0):
         color = tuple(new_color)
     return color
 
+
 def square_gen(pos, rad):
     left = pos[0] - rad
     right = pos[0] + rad
@@ -216,6 +225,7 @@ def square_gen(pos, rad):
                 y = top
                 break
 
+
 def fdist(pos1, pos2):
     return math.sqrt((pos2[0] - pos1[0])**2 + (pos2[1] - pos1[1])**2)
 
@@ -225,9 +235,11 @@ def idist(pos1, pos2):
     fpos2 = [float(i) for i in pos2]
     return fdist(fpos1, fpos2)
 
+
 def profile_name():
     # INFO: expanduser("~") is cross-platform
     return os.path.split(os.path.expanduser("~"))[-1]
+
 
 def get_drive_name(path):
     drive_name = None
@@ -248,10 +260,16 @@ def get_drive_name(path):
             break
     return drive_name
 
-def generate_diff_name(base_path, head_path):
+
+def generate_diff_name(base_path, head_path, file_name=None):
+    if file_name is None:
+        if os.path.isfile(base_path):
+            file_name = os.path.split(base_path)[-1]
+    if file_name is None:
+        file_name = "diffimage"
     base_name = os.path.split(base_path)[-1]
     head_name = os.path.split(head_path)[-1]
-    diff_name = name_fmt2.format(base_name, head_name)
+    diff_name = name_fmt0.format(file_name, base_name, head_name)
     if (base_name == head_name):
         base_drive = get_drive_name(base_name)
         head_drive = get_drive_name(head_name)
@@ -290,14 +308,19 @@ def generate_diff_name(base_path, head_path):
                     )
                     break
                 elif base_r != head_r:
-                    diff_name = name_fmt1.format(
-                        "in "+base_r+" vs in "+head_r
+                    # such as "default_furnace_front_active.png-
+                    # bucket_game-200527-vs-bucket_game.png"
+                    diff_name = name_fmt0.format(
+                        file_name,
+                        base_r,
+                        head_r
                     )
                     break
                 base_l, base_r = os.path.split(base_l)
                 head_l, head_r = os.path.split(head_l)
 
     return diff_name
+
 
 def diff_color(base_color, head_color, enable_convert=False,
                c_max=255, base_indices=None, head_indices=None,
@@ -341,17 +364,22 @@ def diff_color(base_color, head_color, enable_convert=False,
     ValueError if  base_indices and head_indices are both set but the
         length differs.
     """
-    if len(base_color) != len(head_color):
-        if enable_convert:
-            if len(base_color) > len(head_color):
-                head_color = convert_depth(head_color, len(base_color),
-                                           c_max=float(c_max))
+    try:
+        if len(base_color) != len(head_color):
+            if enable_convert:
+                if len(base_color) > len(head_color):
+                    head_color = convert_depth(head_color, len(base_color),
+                                               c_max=float(c_max))
+                else:
+                    base_color = convert_depth(base_color, len(head_color),
+                                               c_max=float(c_max))
             else:
-                base_color = convert_depth(base_color, len(head_color),
-                                           c_max=float(c_max))
-        else:
-            raise ValueError("The channel counts do not match, and"
-                             " enable_convert is False.")
+                raise ValueError("The channel counts do not match, and"
+                                 " enable_convert is False.")
+    except TypeError as ex:
+        # TypeError: object of type 'int' has no len()
+        print("base: {}, head {}".format(base_color, head_color))
+        raise ex
     base_indices_msg = "from parameter"
     head_indices_msg = "from parameter"
     if base_indices is None:
@@ -386,6 +414,7 @@ def diff_color(base_color, head_color, enable_convert=False,
                 diff += float(base_v) - float(head_v)
     return diff / float(len(base_indices)*c_max)
 
+
 def diff_images(base, head, diff_size, diff=None,
                 nochange_color=(0,0,0,255),
                 enable_variance=True, c_max=255, max_count=4,
@@ -396,6 +425,11 @@ def diff_images(base, head, diff_size, diff=None,
     If diff is not None, it must also be an image, and it will be
     changed. Only parts will be changed where base and head differ.
     Grayscale will always be used the amount of difference.
+
+    The base and head images are converted to true color using the PIL
+    convert function (with no parameters, so could be BGR or BGRA) of
+    the image object. If convert isn't called, the getpixel function
+    gets a palette index for indexed images.
 
     Sequential arguments:
     base -- This is the first image for the difference operation.
@@ -426,8 +460,19 @@ def diff_images(base, head, diff_size, diff=None,
                     match either that of base_indices, or if that is
                     None, then match the base channel count.
     """
+    base = base.convert()
+    head = head.convert()
+    # Convert indexed images so getpixel doesn't return an index
+    # (diff_color expects a tuple).
     results = {}
     results["same"] = None
+    results['base'] = {}
+    results['base']['size'] = base.size
+    results['base']['ratio'] = float(base.size[0]) / float(base.size[1])
+    results['head'] = {}
+    results['head']['size'] = base.size
+    results['head']['ratio'] = float(head.size[0]) / float(head.size[1])
+
     w, h = diff_size
     add_color = (0, c_max, 0, c_max)  # green (expanded part if any)
     del_color = (c_max, 0, 0, c_max)  # red (cropped part if any)
@@ -468,18 +513,23 @@ def diff_images(base, head, diff_size, diff=None,
         else:
             del_color = convert_depth(tmp_color, pix_len, c_max=c_max)
 
-
     for y in range(h):
         for x in range(w):
             pos = (x, y)
             color = nochange_color
-            if (x > base.size[0]) or (y > base.size[1]):
+            if (x >= base.size[0]) or (y >= base.size[1]):
                 color = add_color
-            elif (x > head.size[0]) or (y > head.size[1]):
+            elif (x >= head.size[0]) or (y >= head.size[1]):
                 color = del_color
             else:
-                base_color = base.getpixel(pos)
-                head_color = head.getpixel(pos)
+                try:
+                    base_color = base.getpixel(pos)
+                    head_color = head.getpixel(pos)
+                except IndexError as ex:
+                    error("base.size: {}".format(base.size))
+                    error("head.size: {}".format(head.size))
+                    error("pos: {}".format(pos))
+                    raise ex
                 d = diff_color(base_color, head_color, c_max=c_max,
                                max_count=max_count)
                 if d != 0.0:
@@ -502,6 +552,7 @@ def diff_images(base, head, diff_size, diff=None,
 
 
 msg_prefix = "[channel_tinker] "
+
 
 def find_opaque_pos(cti, center, good_minimum=255, max_rad=None,
                     w=None, h=None):
@@ -649,6 +700,7 @@ def draw_circle_from_center(cti, center, rad, color=None, filled=False):
     """
     return draw_square_from_center(cti, center, rad, color=color,
                                    filled=filled, circular=True)
+
 
 def extend(cti, minimum=1, maximum=254,
            make_opaque=False, good_minimum=255, enable_threshold=False,

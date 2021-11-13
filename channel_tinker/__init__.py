@@ -10,7 +10,7 @@ import sys
 name_fmt0 = "{}-{}-vs-{}.png"
 name_fmt1 = "diffimage {}.png"
 name_fmt2 = "diffimage {} vs. {}.png"
-
+verbose = False
 
 class ChannelTinkerProgressInterface:
 
@@ -89,6 +89,7 @@ _error_func = None
 
 def _error(msg):
     sys.stderr.write(msg + "\n")
+    sys.stderr.flush()
 
 _error_func = _error
 
@@ -100,6 +101,9 @@ def error(msg):
     """
     _error_func(msg)
 
+def debug(msg):
+    if verbose:
+        error(msg)
 
 def set_error_func(callback):
     """
@@ -427,9 +431,10 @@ def diff_images(base, head, diff_size, diff=None,
     Grayscale will always be used the amount of difference.
 
     The base and head images are converted to true color using the PIL
-    convert function (with no parameters, so could be BGR or BGRA) of
+    convert function (always 32-bit so that channel counts match) of
     the image object. If convert isn't called, the getpixel function
-    gets a palette index for indexed images.
+    gets a palette index for indexed images. The channel count must
+    match for getpixel as well.
 
     Sequential arguments:
     base -- This is the first image for the difference operation.
@@ -460,8 +465,8 @@ def diff_images(base, head, diff_size, diff=None,
                     match either that of base_indices, or if that is
                     None, then match the base channel count.
     """
-    base = base.convert()
-    head = head.convert()
+    base = base.convert(mode='RGBA')
+    head = head.convert(mode='RGBA')
     # Convert indexed images so getpixel doesn't return an index
     # (diff_color expects a tuple).
     results = {}

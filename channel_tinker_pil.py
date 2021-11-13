@@ -27,7 +27,11 @@ import os
 
 from channel_tinker import diff_images
 from PIL import Image
-from channel_tinker import error
+import PIL
+from channel_tinker import (
+    error,
+    debug,
+)
 
 
 def diff_images_by_path(base_path, head_path, diff_path=None):
@@ -39,13 +43,39 @@ def diff_images_by_path(base_path, head_path, diff_path=None):
     the difference: black is same, closer to white differs (if images
     are different sizes, red is deleted, green is added).
     """
-    base = Image.open(base_path)
-    head = Image.open(head_path)
+    result = None
+    try:
+        base = Image.open(base_path)
+    except PIL.UnidentifiedImageError:
+        result = {
+            'base': {
+                'error': "UnidentifiedImageError"
+            },
+            'head': {
+            },  # It must be a dict to prevent a key error.
+        }
+    try:
+        head = Image.open(head_path)
+    except PIL.UnidentifiedImageError:
+        result2 = {
+            'base': {
+            },  # It must be a dict to prevent a key error.
+            'head': {
+                'error': "UnidentifiedImageError"
+            }
+        }
+        if result is None:
+            result = result2
+        else:
+            result['head'] = result2['head']
+    if result is not None:
+        # Return an error.
+        return result
     w = max(base.size[0], head.size[0])
     h = max(base.size[1], head.size[1])
     diff_size = w, h
-    error("* base size:{}".format(base.size))
-    error("* head size:{}".format(head.size))
+    debug("* base size:{}".format(base.size))
+    debug("* head size:{}".format(head.size))
     diff = None
     # draw = None
     nochange_color = (0, 0, 0, 255)
@@ -54,7 +84,7 @@ def diff_images_by_path(base_path, head_path, diff_path=None):
         # error("* generated diff image in memory")
         # draw = ImageDraw.Draw(diff)
         error("* diff size:{}".format(diff.size))
-    error("Checking {} zone...".format(diff_size))
+    debug("Checking {} zone...".format(diff_size))
     result = diff_images(base, head, diff_size, diff=diff,
                          nochange_color=nochange_color)
     if diff_path is not None:

@@ -5,7 +5,10 @@ import os
 import json
 
 from channel_tinker_pil import diff_images_by_path
-from channel_tinker import generate_diff_name
+from channel_tinker import (
+    generate_diff_name,
+    error,
+)
 
 
 def run(base_path, head_path, diff_name=None):

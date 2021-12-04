@@ -54,6 +54,21 @@ checkDotTypes = [
     ".bmp",
 ]
 
+goodFlagRel = os.path.join("share", "pixmaps", "imageprocessorx.png")
+
+myPath = os.path.split(os.path.abspath(__file__))[0]
+
+prefix = os.environ.get("PREFIX")
+if prefix is None:
+    prefix = "."
+if os.path.isfile(os.path.join(myPath, goodFlagRel)):
+    # If running without installing, use the directory containing the
+    # icon as the prefix.
+    prefix = myPath
+
+share = os.path.join(prefix, "share")
+pixmaps = os.path.join(share, "pixmaps")
+
 class MainFrame(ttk.Frame):
     ISSUE_DIR = 'Specify a main directory.'
     ISSUE_LIST = 'Specify a list file.'
@@ -379,8 +394,7 @@ def main():
     global root
     root = tk.Tk()
     root.title("ImageProcessorX")
-    myPath = os.path.split(os.path.abspath(__file__))[0]
-    # iconPath = iconPath = os.path.join(myPath, "imageprocessorx.xbm")
+    # iconPath = os.path.join(pixmaps, "imageprocessorx.xbm")
     '''
     ^ XBM is the required type for iconbitmap's default param on linux
     supposedly
@@ -388,9 +402,9 @@ def main():
     command-iconbitmap-to-set-window-icon>)
     but doesn't work (see error in comment below).
     '''
-    iconPath = iconPath = os.path.join(myPath, "imageprocessorx.png")
+    iconPath = os.path.join(pixmaps, "imageprocessorx.png")
     if platform.system() == "Windows":
-        iconPath = os.path.join(myPath, "imageprocessorx.ico")
+        iconPath = os.path.join(pixmaps, "imageprocessorx.ico")
     mainframe = MainFrame(root)
     if os.path.isfile(iconPath):
         # root.iconbitmap(default=iconPath)

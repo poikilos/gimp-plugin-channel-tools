@@ -1,4 +1,10 @@
 #!/usr/bin/env python3
+'''
+Compare two image files.
+
+Similar projects:
+- diffimg
+'''
 import sys
 import os
 # from PIL import ImageDraw

@@ -98,7 +98,7 @@ class MainFrame(ttk.Frame):
         self.pack(fill=tk.BOTH, expand=True)
         self.menuBar = tk.Menu(parent)
         self.fileMenu = tk.Menu(self.menuBar, tearoff=0)
-        self.fileMenu.add_command(label="Save Checked",
+        self.fileMenu.add_command(label="Save Filename List (Checked)",
                                   command=self.saveChecked)
         self.fileMenu.add_separator()
         self.fileMenu.add_command(label="Exit", command=quit)

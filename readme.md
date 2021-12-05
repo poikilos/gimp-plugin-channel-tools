@@ -17,7 +17,10 @@ fi
 cp channel_tinker_gimp.py ~/.config/GIMP/2.10/plug-ins/
 if [ -d ~/.config/GIMP/2.10/plug-ins/channel_tinker ]; then
     rm ~/.config/GIMP/2.10/plug-ins/channel_tinker  # try symlink FIRST
-    rm -Rf ~/.config/GIMP/2.10/plug-ins/channel_tinker
+    if [ $? -ne 0 ]; then
+        # If there was an error, assume it is a directory:
+        rm -Rf ~/.config/GIMP/2.10/plug-ins/channel_tinker
+    fi
 fi
 cp -R channel_tinker ~/.config/GIMP/2.10/plug-ins/
 #or
